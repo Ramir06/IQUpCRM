@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Онлайн-заявка — Codix</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8edfb 50%, #f5f7ff 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .form-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(15, 23, 42, 0.1);
+            max-width: 520px;
+            width: 100%;
+            overflow: hidden;
+            animation: slideUp 0.5s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .form-header {
+            background: linear-gradient(135deg, #246FFF 0%, #00C4FA 100%);
+            color: white;
+            padding: 35px 30px 30px;
+            text-align: center;
+        }
+        .form-header .logo {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .form-header .logo i {
+            margin-right: 8px;
+        }
+        .form-header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .form-header p {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        .form-body {
+            padding: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 14px;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .form-group label .required {
+            color: #EA5455;
+        }
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: 'Montserrat', sans-serif;
+            transition: all 0.3s ease;
+            outline: none;
+            background: #fafbfc;
+        }
+        .form-input:focus {
+            border-color: #246FFF;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(36, 111, 255, 0.1);
+        }
+        .form-input::placeholder {
+            color: #9ca3af;
+        }
+        .form-input.error {
+            border-color: #EA5455;
+            box-shadow: 0 0 0 4px rgba(234, 84, 85, 0.1);
+        }
+        .error-text {
+            color: #EA5455;
+            font-size: 12px;
+            margin-top: 6px;
+            display: none;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #246FFF 0%, #00C4FA 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Montserrat', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(36, 111, 255, 0.35);
+        }
+        .submit-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .submit-btn .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .submit-btn.loading .spinner { display: block; }
+        .submit-btn.loading .btn-text { display: none; }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Status screens */
+        .status-screen {
+            text-align: center;
+            padding: 50px 30px;
+        }
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 36px;
+        }
+        .status-icon.success {
+            background: rgba(40, 199, 111, 0.15);
+            color: #28C76F;
+        }
+        .status-icon.error {
+            background: rgba(234, 84, 85, 0.15);
+            color: #EA5455;
+        }
+        .status-icon.warning {
+            background: rgba(255, 159, 67, 0.15);
+            color: #FF9F43;
+        }
+        .status-icon.loading-icon {
+            background: rgba(36, 111, 255, 0.15);
+            color: #246FFF;
+        }
+        .status-screen h2 {
+            font-size: 22px;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        .status-screen p {
+            font-size: 15px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .powered-by {
+            text-align: center;
+            padding: 15px;
+            font-size: 12px;
+            color: #9ca3af;
+            border-top: 1px solid #f3f4f6;
+        }
+        .powered-by a {
+            color: #246FFF;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            .form-header { padding: 25px 20px; }
+            .form-header h1 { font-size: 18px; }
+            .form-body { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container" id="formContainer">
+        <!-- Loading state -->
+        <div class="status-screen" id="loadingScreen">
+            <div class="status-icon loading-icon">
+                <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <h2>Загрузка формы...</h2>
+            <p>Пожалуйста, подождите</p>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCf_G7b2l31J7PMQcZz65TIU79rEfYArgA",
+            authDomain: "sushi-fca33.firebaseapp.com",
+            projectId: "sushi-fca33",
+            storageBucket: "sushi-fca33.firebasestorage.app",
+            messagingSenderId: "82354272222",
+            appId: "1:82354272222:web:3daa237a8a70acafefcf4f",
+            measurementId: "G-ZVF58WE4S7"
+        };
+
+        // Re-use same config; only apiKey + projectId matter for Firestore
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let currentForm = null;
+        let formDocId = null;
+        let isSubmitting = false;
+        let lastSubmitTime = 0;
+
+        function normalizePhone(phone) {
+            return (phone || '').replace(/[\s+\-()]/g, '');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        async function initForm() {
+            const params = new URLSearchParams(window.location.search);
+            const slug = params.get('slug');
+
+            if (!slug) {
+                showError('Форма недоступна', 'Некорректная ссылка на форму.');
+                return;
+            }
+
+            try {
+                const snap = await db.collection('leadForms')
+                    .where('slug', '==', slug)
+                    .limit(1)
+                    .get();
+
+                if (snap.empty) {
+                    showError('Форма недоступна', 'Форма не найдена или была удалена.');
+                    return;
+                }
+
+                const doc = snap.docs[0];
+                currentForm = doc.data();
+                formDocId = doc.id;
+
+                if (!currentForm.isActive) {
+                    showError('Форма недоступна', 'Приём заявок через эту форму временно приостановлен.');
+                    return;
+                }
+
+                renderForm();
+            } catch (err) {
+                console.error('Error loading form:', err);
+                showError('Ошибка загрузки', 'Не удалось загрузить форму. Попробуйте позже.');
+            }
+        }
+
+        function renderForm() {
+            const container = document.getElementById('formContainer');
+            container.innerHTML = `
+                <div class="form-header">
+                    <div class="logo"><i class="fas fa-graduation-cap"></i> Codix</div>
+                    <h1>${escapeHtml(currentForm.name)}</h1>
+                    ${currentForm.description ? `<p>${escapeHtml(currentForm.description)}</p>` : ''}
+                </div>
+                <div class="form-body">
+                    <form id="publicLeadForm" novalidate>
+                        <div class="form-group">
+                            <label>ФИО <span class="required">*</span></label>
+                            <input type="text" id="pfFullName" class="form-input" placeholder="Введите ваше полное имя" autocomplete="name">
+                            <div class="error-text" id="errFullName">Пожалуйста, введите ваше имя</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Возраст</label>
+                            <input type="number" id="pfAge" class="form-input" placeholder="Ваш возраст" min="1" max="120" autocomplete="off">
+                            <div class="error-text" id="errAge">Укажите корректный возраст</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Номер телефона <span class="required">*</span></label>
+                            <input type="tel" id="pfPhone" class="form-input" placeholder="+996 XXX XXX XXX" autocomplete="tel">
+                            <div class="error-text" id="errPhone">Пожалуйста, введите номер телефона</div>
+                        </div>
+                        <button type="submit" class="submit-btn" id="submitBtn">
+                            <span class="btn-text"><i class="fas fa-paper-plane"></i> Отправить заявку</span>
+                            <div class="spinner"></div>
+                        </button>
+                    </form>
+                </div>
+                <div class="powered-by">
+                    Создано на платформе <a href="#">Codix LMS</a>
+                </div>
+            `;
+
+            document.getElementById('publicLeadForm').addEventListener('submit', handleSubmit);
+
+            // Remove error styling on input
+            ['pfFullName', 'pfPhone', 'pfAge'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', () => {
+                        el.classList.remove('error');
+                        const errEl = el.parentElement.querySelector('.error-text');
+                        if (errEl) errEl.style.display = 'none';
+                    });
+                }
+            });
+        }
+
+        function showFieldError(inputId, errId) {
+            const input = document.getElementById(inputId);
+            const err = document.getElementById(errId);
+            if (input) input.classList.add('error');
+            if (err) err.style.display = 'block';
+        }
+
+        function clearFieldErrors() {
+            document.querySelectorAll('.form-input.error').forEach(el => el.classList.remove('error'));
+            document.querySelectorAll('.error-text').forEach(el => el.style.display = 'none');
+        }
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+
+            if (isSubmitting) return;
+
+            // Anti-spam: at least 3 seconds between submissions
+            const now = Date.now();
+            if (now - lastSubmitTime < 3000) return;
+
+            clearFieldErrors();
+
+            const fullName = (document.getElementById('pfFullName')?.value || '').trim();
+            const age = (document.getElementById('pfAge')?.value || '').trim();
+            const phone = (document.getElementById('pfPhone')?.value || '').trim();
+
+            let hasError = false;
+
+            if (!fullName) {
+                showFieldError('pfFullName', 'errFullName');
+                hasError = true;
+            }
+            if (!phone) {
+                showFieldError('pfPhone', 'errPhone');
+                hasError = true;
+            }
+            if (age && (isNaN(age) || parseInt(age) < 1 || parseInt(age) > 120)) {
+                showFieldError('pfAge', 'errAge');
+                hasError = true;
+            }
+
+            if (hasError) return;
+
+            isSubmitting = true;
+            lastSubmitTime = now;
+            const btn = document.getElementById('submitBtn');
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            try {
+                // Normalize phone for duplicate check
+                const normalizedPhone = normalizePhone(phone);
+
+                // Check for duplicate by phone
+                const existingSnap = await db.collection('leads').get();
+                let isDuplicate = false;
+                existingSnap.forEach(doc => {
+                    const leadPhone = normalizePhone(doc.data().phone || '');
+                    if (leadPhone && leadPhone === normalizedPhone) {
+                        isDuplicate = true;
+                    }
+                });
+
+                if (isDuplicate) {
+                    showWarning(
+                        'Заявка уже существует',
+                        'Заявка с этим номером уже существует. Мы скоро свяжемся с вами.'
+                    );
+                    return;
+                }
+
+                // Create lead
+                await db.collection('leads').add({
+                    name: fullName,
+                    fullName: fullName,
+                    age: age || '',
+                    phone: phone,
+                    status: currentForm.stageId || 'new',
+                    stageId: currentForm.stageId || 'new',
+                    stageName: currentForm.stageName || '',
+                    source: currentForm.sourceId || '',
+                    sourceId: currentForm.sourceId || '',
+                    sourceName: currentForm.sourceName || '',
+                    formId: formDocId,
+                    formName: currentForm.name || '',
+                    createdFrom: 'public_form',
+                    priority: 'medium',
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                });
+
+                showSuccess(
+                    'Заявка отправлена!',
+                    currentForm.successMessage || 'Спасибо! Мы скоро свяжемся с вами.'
+                );
+
+            } catch (err) {
+                console.error('Error submitting lead:', err);
+                btn.classList.remove('loading');
+                btn.disabled = false;
+                isSubmitting = false;
+                showError('Ошибка отправки', 'Произошла ошибка при отправке заявки. Попробуйте ещё раз.');
+            }
+        }
+
+        function showSuccess(title, message) {
+            const container = document.getElementById('formContainer');
+            container.innerHTML = `
+                <div class="status-screen">
+                    <div class="status-icon success">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h2>${escapeHtml(title)}</h2>
+                    <p>${escapeHtml(message)}</p>
+                </div>
+                <div class="powered-by">
+                    Создано на платформе <a href="#">Codix LMS</a>
+                </div>
+            `;
+        }
+
+        function showWarning(title, message) {
+            const container = document.getElementById('formContainer');
+            container.innerHTML = `
+                <div class="status-screen">
+                    <div class="status-icon warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h2>${escapeHtml(title)}</h2>
+                    <p>${escapeHtml(message)}</p>
+                </div>
+                <div class="powered-by">
+                    Создано на платформе <a href="#">Codix LMS</a>
+                </div>
+            `;
+        }
+
+        function showError(title, message) {
+            const container = document.getElementById('formContainer');
+            container.innerHTML = `
+                <div class="status-screen">
+                    <div class="status-icon error">
+                        <i class="fas fa-times"></i>
+                    </div>
+                    <h2>${escapeHtml(title)}</h2>
+                    <p>${escapeHtml(message)}</p>
+                </div>
+                <div class="powered-by">
+                    Создано на платформе <a href="#">Codix LMS</a>
+                </div>
+            `;
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initForm);
+    </script>
+</body>
+</html>
